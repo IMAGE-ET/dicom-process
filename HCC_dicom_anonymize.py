@@ -23,22 +23,20 @@ import re
 from datetime import datetime
 
 
-
-
 #TODO: Replce anonymization field names with Tags (hexadecimal)
 ANONYMIZATION_FIELDS = ['StudyDate','SeriesDate','AcquisitionDate','ContentDate','OverlayDate',\
-                    'CurveDate','AcquisitionDatetime','StudyTime','SeriesTime','AcquisitionTime',\
+                    'CurveDate','AcquisitionDateTime','StudyTime','SeriesTime','AcquisitionTime',\
                     'ContentTime','OverlayTime','CurveTime','AccessionNumber','InstitutionName',\
-                    'InstitutionAddress','ReferringPhysiciansName','ReferringPhysiciansAddress',\
-                    'ReferringPhysiciansTelephoneNumber','ReferringPhysicianIDSequence',\
+                    'InstitutionAddress','ReferringPhysicianName','ReferringPhysicianAddress',\
+                    'ReferringPhysicianTelephoneNumber','ReferringPhysicianIDSequence',\
                     'InstitutionalDepartmentName','PhysicianOfRecord','PhysicianOfRecordIDSequence',\
-                    'PerformingPhysiciansName','PerformingPhysicianIDSequence','NameOfPhysicianReadingStudy',\
-                    'PhysicianReadingStudyIDSequence','OperatorsName','PatientsName','PatientID',\
-                    'IssuerOfPatientID','PatientsBirthDate','PatientsBirthTime','PatientsSex',\
-                    'OtherPatientIDs','OtherPatientNames','PatientsBirthName','PatientsAge',\
-                    'PatientsAddress','PatientsMothersBirthName','CountryOfResidence',\
-                    'RegionOfResidence','PatientsTelephoneNumbers','StudyID','CurrentPatientLocation',\
-                    'PatientsInstitutionResidence','DateTime','Date','Time','PersonName',\
+                    'PerformingPhysicianName','PerformingPhysicianIDSequence','NameOfPhysicianReadingStudy',\
+                    'PhysicianReadingStudyIDSequence','OperatorsName','PatientName','PatientID',\
+                    'IssuerOfPatientID','PatientBirthDate','PatientBirthTime','PatientSex',\
+                    'OtherPatientIDs','OtherPatientNames','PatientBirthName','PatientAge',\
+                    'PatientAddress','PatientMothersBirthName','CountryOfResidence',\
+                    'RegionOfResidence','PatientTelephoneNumbers','StudyID','CurrentPatientLocation',\
+                    'PatientInstitutionResidence','DateTime','Date','Time','PersonName',\
                     'ProtocolName']
 
 #SAVE_DIR = '/home/divine/HCC_MultiScale/PatientImageData/Thaiss_v1/RadiologyData/test2'
@@ -139,6 +137,8 @@ def sequence_name_to_folder(dir_to_clean='',dicom_suffix='dcm'):
                     new_name = os.path.join(cwd,folder_name,os.path.basename(anyFile))
                     print("Old Name: {}\t New Name: {}".format(old_name,new_name))
                     os.rename(old_name,new_name)
+    if not os.listdir(root):
+        os.rmdir(root)
 
 def multi_sequence_name_to_folder(root_dir='', dirs_to_clean=[]):
     """
@@ -163,6 +163,7 @@ def anonymize_dicom(dicom_file,patient_name='anonymous',
     """
     #having lots of issues with the character encoding
     # changed to python 3, now having more fun
+    #dicom.config.debug()
     try:
         #im = dicom.read_file(unicode(dicom_file,'utf-8'))
         im = dicom.read_file(dicom_file)
@@ -182,16 +183,22 @@ def anonymize_dicom(dicom_file,patient_name='anonymous',
             except AttributeError:
                 continue
     # now replace fields to anonymize with ''
+    #print(im.dir())
+    #print(im.data_element('ReferringPhysicianAddress').value)
     for attr in fields_to_anonymize:
-        if attr=='PatientsName':
+        if attr=='PatientName':
             set_attr = patient_name
         else:
             set_attr=''
         try:
-            setattr(im,attr,set_attr)
-            #print "{} has been set to {}".format(attr, set_attr)
+            #print(attr, im.data_element(attr).value )
+            im.data_element(attr).value = set_attr
+                # setattr(im,attr,set_attr)
+                #print "{} has been set to {}".format(attr, set_attr)
+        except KeyError:
+            print("KeyError: {}".format(attr))
         except AttributeError:
-            print("The following attribute not found: {}".format(set_attr))
+            print("The following attribute not found: {}".format(attr))
         except UnboundLocalError:
             print("Can't set attribute: utf-8 codec can't decode byte...filename {}".format(dicom_file))
 
@@ -199,6 +206,7 @@ def anonymize_dicom(dicom_file,patient_name='anonymous',
     # now save the new dicom
     new_name = os.path.join(path_to_save,new_dicom_name)
     try:
+        print(new_name)
         im.save_as(new_name)
     except ValueError:
         #TODO got put more accurate values here.
@@ -284,7 +292,6 @@ def meta_data_from_dir_name(dir_name):
         #df = unicode(dicom_file)
         #df = dicom_file.decode('utf-16').encode('utf-8')
         #im = dicom.read_file(df)
-
     return patient_meta_info
 
 def make_QBiC_readable(meta_data_info, FNAME_COMPONENTS=FNAME_COMPONENTS):
@@ -357,8 +364,6 @@ def anonymize_to_qbic(study_folder='',save_dir=SAVE_DIR):
         print("making directory {}...".format(os.path.join(SAVE_DIR,qbic_identifier)))
 
 
-
-        ''' TODO: multiple subfolders'''
     sequence_dirs = glob(study_folder+'/*/')
     for sequence_dir in sequence_dirs:
         if not os.path.isdir(sequence_dir):
@@ -393,8 +398,8 @@ def anonymize_to_qbic(study_folder='',save_dir=SAVE_DIR):
                             fields_to_anonymize=ANONYMIZATION_FIELDS,
                             fields_to_return=None,path_to_save=path_to_save,
                             new_dicom_name=new_dicom_name)
-        	if os.path.isfile(f):
-	        	dicom_file = f
+            if os.path.isfile(f):
+                dicom_file = f
                 rand_num =  np.random.randint(10000000000000,size=1)[0]
                 new_dicom_name = str(rand_num)+'.dcm'
                 anonymize_dicom(dicom_file,patient_name=meta_data['patient_name'],
